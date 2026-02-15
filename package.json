@@ -1,24 +1,32 @@
+
 {
-  "name": "limpiador-de-metadatos-pro",
+  "name": "limpiador-metadatos-pro",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "prepare-ffmpeg": "mkdir -p public/ffmpeg && cp node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.js public/ffmpeg/ && cp node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm public/ffmpeg/ && cp node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.worker.js public/ffmpeg/",
+    "dev": "npm run prepare-ffmpeg && vite",
+    "build": "npm run prepare-ffmpeg && vite build",
+    "start": "node server.js",
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "@ffmpeg/ffmpeg": "^0.12.6",
+    "@ffmpeg/util": "^0.12.1",
+    "@ffmpeg/core": "^0.12.6",
     "@google/genai": "^1.41.0",
-    "@ffmpeg/ffmpeg": "^0.12.15",
-    "@ffmpeg/util": "^0.12.2"
+    "express": "^4.21.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "vite": "^6.0.0"
   }
 }

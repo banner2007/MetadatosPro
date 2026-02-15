@@ -1,0 +1,29 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { 
+  @apply bg-[#020617] text-[#f8fafc];
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+.gradient-text {
+    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.glass-panel {
+    @apply bg-slate-900/70 backdrop-blur-[20px] border border-white/10;
+}
+
+@keyframes shake-x {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+
+.animate-shake-x {
+  animation: shake-x 0.4s ease-in-out;
+}

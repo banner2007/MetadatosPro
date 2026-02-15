@@ -1,3 +1,4 @@
+
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
 
@@ -25,7 +26,8 @@ export const limpiarMetadatos = async (file: File) => {
   const inputName = 'input.mp4'
   const outputName = 'output.mp4'
 
-  await ffmpeg.writeFile(inputName, await file.arrayBuffer())
+  // Fix: Convert ArrayBuffer to Uint8Array because ffmpeg.writeFile requires Uint8Array or string as data input
+  await ffmpeg.writeFile(inputName, new Uint8Array(await file.arrayBuffer()))
 
   await ffmpeg.exec([
     '-i', inputName,

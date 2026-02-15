@@ -1,13 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Metadata Purge Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.umd.js"></script>
-    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <link rel="stylesheet" href="/index.css">
 <script type="importmap">
 {
   "imports": {
@@ -16,96 +14,18 @@
     "react/": "https://esm.sh/react@^19.2.4/",
     "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
     "@ffmpeg/ffmpeg": "https://esm.sh/@ffmpeg/ffmpeg@^0.12.15",
-    "@ffmpeg/util": "https://esm.sh/@ffmpeg/util@^0.12.2"
+    "@ffmpeg/util": "https://esm.sh/@ffmpeg/util@^0.12.2",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
+    "url": "https://esm.sh/url@^0.11.4",
+    "express": "https://esm.sh/express@^5.2.1",
+    "path": "https://esm.sh/path@^0.12.7"
   }
 }
 </script>
 </head>
-<body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-4">
-
+<body>
     <div id="root"></div>
-
-    <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full shadow-2xl">
-        <h1 class="text-3xl font-bold text-center mb-6 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            Limpiador Pro
-        </h1>
-
-        <div id="drop-zone" class="border-2 border-dashed border-slate-700 rounded-xl p-10 text-center hover:border-blue-500 cursor-pointer transition-all">
-            <input type="file" id="file-input" class="hidden" accept="video/*">
-            <p id="status-text" class="text-slate-400">Selecciona el video para limpiar</p>
-        </div>
-
-        <div id="progress-container" class="hidden mt-6">
-            <div class="w-full bg-slate-800 rounded-full h-2.5">
-                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
-            </div>
-            <p id="progress-text" class="text-center text-xs mt-2 text-slate-500 font-mono italic">PREPARANDO MOTOR...</p>
-        </div>
-    </div>
-
-    <script>
-        const { FFmpeg } = window.FFmpegWasm;
-        const { fetchFile, toBlobURL } = window.FFmpegUtil;
-        let ffmpeg = null;
-
-        async function initFFmpeg() {
-            try {
-                ffmpeg = new FFmpeg();
-                
-                // Definimos la base de los archivos core
-                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-                
-                // CARGA BLINDADA: Convertimos todo a Blobs locales
-                await ffmpeg.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
-                });
-
-                console.log("FFmpeg cargado correctamente como Blob local");
-            } catch (err) {
-                console.error("Fallo de inicialización:", err);
-                document.getElementById('progress-text').innerText = "ERROR: BLOQUEO DE SEGURIDAD DEL NAVEGADOR";
-            }
-        }
-
-        const fileInput = document.getElementById('file-input');
-        const dropZone = document.getElementById('drop-zone');
-
-        dropZone.onclick = () => fileInput.click();
-
-        fileInput.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            if (!ffmpeg) await initFFmpeg();
-
-            document.getElementById('progress-container').classList.remove('hidden');
-            
-            const { name } = file;
-            await ffmpeg.writeFile(name, await fetchFile(file));
-
-            ffmpeg.on('progress', ({ progress }) => {
-                const p = Math.round(progress * 100);
-                document.getElementById('progress-bar').style.width = `${p}%`;
-                document.getElementById('progress-text').innerText = `PURGANDO METADATOS: ${p}%`;
-            });
-
-            // Comando de limpieza rápida sin pérdida de calidad
-            await ffmpeg.exec(['-i', name, '-map_metadata', '-1', '-c', 'copy', 'clean_' + name]);
-
-            const data = await ffmpeg.readFile('clean_' + name);
-            const url = URL.createObjectURL(new Blob([data.buffer], { type: file.type }));
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'purgado_' + name;
-            a.click();
-            
-            document.getElementById('progress-text').innerText = "¡LIMPIEZA COMPLETADA!";
-        };
-
-        initFFmpeg();
-    </script>
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>
