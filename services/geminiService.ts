@@ -2,7 +2,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Fix: Initialize GoogleGenAI using the apiKey property directly from process.env.API_KEY
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeVideoContent = async (fileName: string): Promise<AIAnalysisResult> => {
   try {

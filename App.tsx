@@ -69,6 +69,7 @@ const App: React.FC = () => {
     
     try {
       const ffmpeg = new FFmpeg();
+      // Usar jsdelivr con toBlobURL para evitar SecurityError en el Worker cross-origin
       const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
       
       await ffmpeg.load({
@@ -81,7 +82,7 @@ const App: React.FC = () => {
       setStatus(AppStatus.IDLE);
     } catch (error: any) {
       console.error("FFmpeg Load Error:", error);
-      setErrorMsg("Error de sistema: No se pudo cargar el motor de limpieza. Revisa tu conexión.");
+      setErrorMsg(`Fallo de carga: ${error.message || 'Error de conexión con los recursos FFmpeg'}. Desactiva bloqueadores de anuncios.`);
       setStatus(AppStatus.ERROR);
     }
   };
@@ -91,10 +92,12 @@ const App: React.FC = () => {
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    // Fix: Explicitly cast e.target to HTMLInputElement to resolve the "Property 'files' does not exist" error in TypeScript
+    const target = e.target as HTMLInputElement;
+    const file = target.files?.[0];
     if (file) {
       if (file.size > 200 * 1024 * 1024) {
-        setErrorMsg("Archivo demasiado grande. El límite es de 200MB por seguridad.");
+        setErrorMsg("Archivo demasiado grande. El límite es de 200MB.");
         setStatus(AppStatus.ERROR);
         return;
       }
@@ -110,31 +113,27 @@ const App: React.FC = () => {
   const processVideo = async () => {
     if (!videoFile) return;
     
-    // Si no está cargado, intentamos cargar y luego procesar
     if (!ffmpegRef.current?.loaded) {
       await loadFFmpeg();
       if (!ffmpegRef.current?.loaded) return;
     }
 
     setStatus(AppStatus.PROCESSING);
-    setProgress(5); // Iniciar con algo de progreso visual inmediato
+    setProgress(5);
     
     const ffmpeg = ffmpegRef.current;
-    const inputName = `in_${Date.now()}.mp4`;
-    const outputName = `out_${Date.now()}.mp4`;
+    const inputName = `input_${Date.now()}.mp4`;
+    const outputName = `clean_${Date.now()}.mp4`;
 
     try {
       ffmpeg.on('progress', ({ progress }: { progress: number }) => {
-        // Aseguramos un mínimo de progreso visual
         setProgress(Math.max(progress * 100, 15));
       });
 
-      // Paso 1: Escribir archivo
       await ffmpeg.writeFile(inputName, await fetchFile(videoFile));
-      setProgress(25);
+      setProgress(30);
 
-      // Paso 2: Ejecutar comando de limpieza
-      // -map_metadata -1 : Purgado total
+      // -map_metadata -1 elimina metadatos, -c copy mantiene calidad original
       const result = await ffmpeg.exec([
         '-i', inputName,
         '-map_metadata', '-1',
@@ -143,31 +142,30 @@ const App: React.FC = () => {
         outputName
       ]);
 
-      if (result !== 0) throw new Error("Fallo en la ejecución del purgado.");
-      setProgress(85);
+      if (result !== 0) throw new Error("FFmpeg no pudo procesar el archivo.");
+      setProgress(90);
 
-      // Paso 3: Leer y generar URL
       const data = await ffmpeg.readFile(outputName);
       const url = URL.createObjectURL(new Blob([(data as Uint8Array).buffer], { type: 'video/mp4' }));
       setOutputUrl(url);
 
-      // Paso 4: Descarga automática inmediata
-      const link = document.createElement('a');
+      // Descarga Automática
+      // Fix: Access document through window and cast to any to resolve "Cannot find name 'document'" error
+      const doc = (window as any).document;
+      const link = doc.createElement('a');
       link.href = url;
-      link.download = `purgado_${videoFile.name}`;
-      document.body.appendChild(link);
+      link.download = `limpio_${videoFile.name}`;
+      doc.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      doc.body.removeChild(link);
       
       setProgress(100);
 
-      // Limpieza de archivos temporales
       try {
         await ffmpeg.deleteFile(inputName);
         await ffmpeg.deleteFile(outputName);
       } catch (e) {}
 
-      // Paso 5: Análisis de IA
       setStatus(AppStatus.ANALYZING);
       const aiResponse = await analyzeVideoContent(videoFile.name);
       setAiResult(aiResponse);
@@ -175,7 +173,7 @@ const App: React.FC = () => {
       setStatus(AppStatus.COMPLETED);
     } catch (error: any) {
       console.error(error);
-      setErrorMsg("Error de procesamiento. Verifica que el video no esté protegido.");
+      setErrorMsg("Error durante el procesamiento. El archivo podría estar dañado o no ser compatible.");
       setStatus(AppStatus.ERROR);
     }
   };
@@ -197,12 +195,11 @@ const App: React.FC = () => {
         <section className="glass-panel rounded-[3rem] p-10 shadow-2xl border-white/10 relative overflow-hidden">
           {status === AppStatus.LOADING_FFMPEG && (
             <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-2xl z-40 flex flex-col items-center justify-center text-center px-4">
-              <div className="relative mb-8">
-                <div className="w-24 h-24 border-8 border-blue-500/10 rounded-full"></div>
-                <div className="w-24 h-24 border-8 border-blue-600 border-t-transparent rounded-full animate-spin absolute inset-0 shadow-[0_0_30px_rgba(37,99,235,0.4)]"></div>
+              <div className="w-24 h-24 border-8 border-blue-500/10 rounded-full relative mb-8">
+                <div className="w-24 h-24 border-8 border-blue-600 border-t-transparent rounded-full animate-spin absolute inset-0 -top-2 -left-2 shadow-[0_0_30px_rgba(37,99,235,0.4)]"></div>
               </div>
               <h3 className="text-white font-black text-3xl uppercase tracking-tighter">Iniciando Motor</h3>
-              <p className="text-slate-500 text-sm mt-4 font-bold max-w-xs uppercase tracking-widest">Descargando procesadores locales de privacidad...</p>
+              <p className="text-slate-500 text-sm mt-4 font-bold uppercase tracking-widest">Configurando entorno de seguridad local...</p>
             </div>
           )}
 
@@ -216,7 +213,7 @@ const App: React.FC = () => {
                     </svg>
                   </div>
                   <h4 className="mb-2 text-4xl font-black text-white uppercase tracking-tighter">Purifica tu Video</h4>
-                  <p className="text-slate-500 text-sm font-black uppercase tracking-widest opacity-60">Seguridad Total • Sin nubes • Sin rastros</p>
+                  <p className="text-slate-500 text-sm font-black uppercase tracking-widest opacity-60">100% Local • Máxima Privacidad</p>
                 </div>
                 <input type="file" className="hidden" accept="video/*" onChange={handleFileChange} />
               </label>
@@ -233,7 +230,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="overflow-hidden">
                       <p className="font-black text-slate-100 text-2xl truncate max-w-[200px] sm:max-w-md">{videoFile.name}</p>
-                      <p className="text-sm text-blue-500/80 font-black uppercase tracking-widest">{(videoFile.size / (1024 * 1024)).toFixed(2)} Megabytes</p>
+                      <p className="text-sm text-blue-500/80 font-black uppercase tracking-widest">{(videoFile.size / (1024 * 1024)).toFixed(2)} MB</p>
                     </div>
                   </div>
                   <button onClick={reset} className="text-slate-600 hover:text-red-500 p-4 hover:bg-red-500/10 rounded-full transition-all">
@@ -248,7 +245,6 @@ const App: React.FC = () => {
                     onClick={processVideo}
                     className="w-full py-8 bg-blue-600 hover:bg-blue-500 text-white font-black text-3xl rounded-[2rem] transition-all shadow-[0_20px_50px_rgba(37,99,235,0.3)] active:scale-95 transform hover:-translate-y-2 flex items-center justify-center gap-4"
                   >
-                    <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                     PURGAR Y DESCARGAR
                   </button>
                 )}
@@ -264,34 +260,31 @@ const App: React.FC = () => {
             
             {status === AppStatus.COMPLETED && outputUrl && (
               <div className="w-full space-y-10 animate-in fade-in zoom-in-95 duration-700">
-                <div className="bg-green-600/10 border border-green-500/20 p-10 rounded-[3rem] flex items-center space-x-8 shadow-2xl relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <svg className="w-32 h-32 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M2.166 4.9L9.03 9.069a2.25 2.25 0 002.248 0l6.865-4.169A2.25 2.25 0 0015.896 1.5h-11.79A2.25 2.25 0 002.167 4.9z" clipRule="evenodd" /><path d="M18 8.162l-6.145 3.73a3.75 3.75 0 01-3.71 0L2 8.162V13a2.25 2.25 0 002.25 2.25h11.5A2.25 2.25 0 0018 13V8.162z" /></svg>
-                  </div>
-                  <div className="bg-green-600 rounded-3xl p-5 shadow-[0_0_30px_rgba(22,163,74,0.5)] relative z-10">
+                <div className="bg-green-600/10 border border-green-500/20 p-10 rounded-[3rem] flex items-center space-x-8 shadow-2xl relative">
+                  <div className="bg-green-600 rounded-3xl p-5 shadow-[0_0_30px_rgba(22,163,74,0.5)]">
                     <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" stroke4="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <div className="relative z-10">
-                    <h4 className="text-green-500 font-black text-3xl uppercase tracking-tighter">Archivo Purificado</h4>
-                    <p className="text-green-400/70 text-lg mt-1 font-bold">Descarga completada. El video ya no tiene huellas de origen.</p>
+                  <div>
+                    <h4 className="text-green-500 font-black text-3xl uppercase tracking-tighter">Purificación Exitosa</h4>
+                    <p className="text-green-400/70 text-lg mt-1 font-bold">Descarga automática iniciada.</p>
                   </div>
                 </div>
 
-                <TechnicalReport fileName={videoFile?.name || 'video_anonimo.mp4'} />
+                <TechnicalReport fileName={videoFile?.name || 'video.mp4'} />
                 
                 <div className="flex flex-col sm:flex-row gap-6">
                   <a
                     href={outputUrl}
-                    download={`purgado_${videoFile?.name || 'video'}`}
-                    className="flex-[2] py-8 bg-slate-800 hover:bg-slate-700 text-white font-black text-2xl rounded-[2rem] text-center transition-all border border-white/10 shadow-xl"
+                    download={`limpio_${videoFile?.name || 'video'}`}
+                    className="flex-[2] py-8 bg-slate-800 hover:bg-slate-700 text-white font-black text-2xl rounded-[2rem] text-center transition-all border border-white/10"
                   >
                     FORZAR RE-DESCARGA
                   </a>
                   <button
                     onClick={reset}
-                    className="flex-1 py-8 bg-blue-600 hover:bg-blue-500 text-white font-black text-2xl rounded-[2rem] transition-all shadow-xl shadow-blue-900/20"
+                    className="flex-1 py-8 bg-blue-600 hover:bg-blue-500 text-white font-black text-2xl rounded-[2rem] transition-all"
                   >
                     OTRO VIDEO
                   </button>
@@ -300,11 +293,11 @@ const App: React.FC = () => {
             )}
 
             {status === AppStatus.ERROR && (
-               <div className="w-full p-10 bg-red-600/10 border border-red-500/30 rounded-[3rem] animate-in shake-x shadow-2xl">
-                  <h5 className="text-red-500 font-black text-3xl uppercase mb-4 tracking-tighter">Fallo en la Purga</h5>
+               <div className="w-full p-10 bg-red-600/10 border border-red-500/30 rounded-[3rem] animate-shake-x shadow-2xl">
+                  <h5 className="text-red-500 font-black text-3xl uppercase mb-4 tracking-tighter">Error Crítico</h5>
                   <p className="text-red-400/80 text-lg mb-10 font-bold leading-tight">{errorMsg}</p>
-                  <button onClick={reset} className="w-full py-6 bg-red-600/20 text-red-500 font-black text-xl rounded-3xl border border-red-500/30 transition-all hover:bg-red-600/30">
-                    REINTENTAR PROCESO
+                  <button onClick={() => { reset(); loadFFmpeg(); }} className="w-full py-6 bg-red-600/20 text-red-500 font-black text-xl rounded-3xl border border-red-500/30">
+                    RECARGAR MOTOR
                   </button>
                </div>
             )}
@@ -314,26 +307,23 @@ const App: React.FC = () => {
         {aiResult && status === AppStatus.COMPLETED && (
           <section className="animate-in fade-in slide-in-from-bottom-16 duration-1000 space-y-12 py-10">
             <h2 className="text-5xl font-black flex items-center gap-6">
-              <span className="p-5 bg-purple-600/20 rounded-[2rem] border border-purple-500/20 shadow-2xl">
+              <span className="p-5 bg-purple-600/20 rounded-[2rem] border border-purple-500/20">
                 <svg className="w-12 h-12 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
                 </svg>
               </span>
-              Plan Viral Gemini
+              Estrategia Viral Gemini
             </h2>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              <div className="glass-panel p-12 rounded-[3.5rem] group hover:border-blue-500/30 transition-all duration-700 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <svg className="w-40 h-40 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                </div>
-                <h3 className="text-blue-500 text-xs font-black uppercase tracking-[0.5em] mb-8">Hook de Visualización</h3>
+              <div className="glass-panel p-12 rounded-[3.5rem] group hover:border-blue-500/30 transition-all duration-700 shadow-2xl">
+                <h3 className="text-blue-500 text-xs font-black uppercase tracking-[0.5em] mb-8">Título Hook</h3>
                 <p className="text-4xl font-black text-white leading-[1.1] mb-12 tracking-tight">"{aiResult.suggestedTitle}"</p>
                 
                 <h3 className="text-purple-500 text-xs font-black uppercase tracking-[0.5em] mb-6">Discovery Tags</h3>
                 <div className="flex flex-wrap gap-4">
                   {aiResult.suggestedHashtags.map((tag, i) => (
-                    <span key={i} className="px-6 py-4 bg-slate-900/80 text-purple-400 rounded-3xl text-lg font-black border border-white/5 hover:bg-purple-600 hover:text-white transition-all transform hover:-translate-y-1">
+                    <span key={i} className="px-6 py-4 bg-slate-900/80 text-purple-400 rounded-3xl text-lg font-black border border-white/5">
                       {tag}
                     </span>
                   ))}
@@ -345,10 +335,10 @@ const App: React.FC = () => {
                 <ul className="space-y-10">
                   {aiResult.optimizationTips.map((tip, i) => (
                     <li key={i} className="flex items-start gap-8 group/item">
-                      <span className="flex-shrink-0 w-14 h-14 rounded-3xl bg-blue-600/10 text-blue-500 flex items-center justify-center text-2xl font-black border border-white/5 group-hover/item:bg-blue-600 group-hover/item:text-white transition-all duration-500">
+                      <span className="flex-shrink-0 w-14 h-14 rounded-3xl bg-blue-600/10 text-blue-500 flex items-center justify-center text-2xl font-black border border-white/5 group-hover/item:bg-blue-600 group-hover/item:text-white transition-all">
                         {i + 1}
                       </span>
-                      <p className="text-slate-100 text-2xl font-bold leading-tight pt-1 group-hover/item:text-white transition-colors">{tip}</p>
+                      <p className="text-slate-100 text-2xl font-bold leading-tight pt-1">{tip}</p>
                     </li>
                   ))}
                 </ul>
@@ -358,12 +348,10 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="mt-40 pt-16 border-t border-slate-800/50 text-center relative overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent"></div>
-        <p className="text-slate-600 text-[12px] font-black tracking-[0.5em] uppercase opacity-50 mb-4">
-          Privacy First Protocol • FFmpeg local core • Gemini Flash 3
+      <footer className="mt-40 pt-16 border-t border-slate-800/50 text-center opacity-50">
+        <p className="text-slate-600 text-[12px] font-black tracking-[0.5em] uppercase mb-4">
+          Local Process • No Cloud Data • Gemini Flash 3
         </p>
-        <p className="text-slate-700 text-[10px] font-bold">© 2025 METADATA PURGE. NO DATA LEAVES YOUR BROWSER.</p>
       </footer>
     </div>
   );
