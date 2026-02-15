@@ -3,48 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Metadata Purge | Limpieza Quirúrgica</title>
+    <title>Metadata Purge Pro</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.7/ffmpeg.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-util/0.12.1/index.umd.min.js"></script>
+
     <style>
-        body { 
-          background-color: #0a0a0c; 
-          color: #e2e8f0; 
-          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-        }
-        .gradient-text {
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(24px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        @keyframes shake-x {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-10px); }
-          75% { transform: translateX(10px); }
-        }
-        .animate-shake-x {
-          animation: shake-x 0.5s ease-in-out;
-        }
+        body { background: #0f172a; color: white; font-family: ui-sans-serif, system-ui; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
-    "@ffmpeg/ffmpeg": "https://esm.sh/@ffmpeg/ffmpeg@^0.12.15",
-    "@ffmpeg/util": "https://esm.sh/@ffmpeg/util@^0.12.2"
-  }
-}
-</script>
 </head>
-<body>
+<body class="min-h-screen flex items-center justify-center p-4">
+
     <div id="root"></div>
-    <script type="module" src="index.tsx"></script>
+
+    <div class="glass p-8 rounded-3xl max-w-lg w-full shadow-2xl text-center">
+        <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-cyan-400 to-blue-600 bg-clip-text text-transparent">
+            Metadata Purge Pro
+        </h1>
+        <p class="text-slate-400 mb-8">Limpieza de metadatos segura y local</p>
+
+        <div id="drop-zone" class="border-2 border-dashed border-slate-600 rounded-2xl p-10 cursor-pointer hover:border-cyan-500 transition-all group">
+            <input type="file" id="file-input" class="hidden" accept="video/*">
+            <div class="text-slate-500 group-hover:text-cyan-400 mb-2">📁</div>
+            <p id="status-text" class="text-slate-300">Haz clic para seleccionar video</p>
+        </div>
+
+        <div id="progress-container" class="hidden mt-6">
+            <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+                <div id="progress-bar" class="bg-cyan-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+            <p id="progress-text" class="text-xs mt-3 text-cyan-400 font-mono uppercase tracking-widest">Iniciando...</p>
+        </div>
+
+        <div id="error-msg" class="hidden mt-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-400">
+            <p class="text-sm font-bold" id="error-detail"></p>
+            <button onclick="location.reload()" class="mt-2 text-xs underline">Reintentar</button>
+        </div>
+    </div>
+
+    <script>
+        // Verificamos que las librerías cargaron
+        const { FFmpeg } = window.FFmpegWasm || {};
+        const { fetchFile, toBlobURL } = window.FFmpegUtil || {};
+
+        let ffmpeg = null;
+
+        async function initFFmpeg() {
+            if (!FFmpeg) {
+                showError("Error: No se pudieron cargar las librerías de video.");
+                return;
+            }
+            
+            try {
+                ffmpeg = new FFmpeg();
+                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+                
+                await ffmpeg.load({
+                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                });
+                console.log("FFmpeg cargado correctamente.");
+            } catch (e) {
+                console.error(e);
+                showError("Error de seguridad: Tu navegador bloquea el procesador de video.");
+            }
+        }
+
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+
+        dropZone.onclick = () => fileInput.click();
+
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!ffmpeg) await initFFmpeg();
+            
+            document.getElementById('progress-container').classList.remove('hidden');
+            document.getElementById('error-msg').classList.add('hidden');
+
+            try {
+                await ffmpeg.writeFile('input', await fetchFile(file));
+
+                ffmpeg.on('progress', ({ progress }) => {
+                    const p = Math.round(progress * 100);
+                    document.getElementById('progress-bar').style.width = `${p}%`;
+                    document.getElementById('progress-text').innerText = `PROCESANDO: ${p}%`;
+                });
+
+                // Comando profesional para remover metadatos sin perder calidad
+                await ffmpeg.exec(['-i', 'input', '-map_metadata', '-1', '-c', 'copy', 'output.mp4']);
+
+                const data = await ffmpeg.readFile('output.mp4');
+                const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `limpio_${file.name}`;
+                a.click();
+
+                document.getElementById('progress-text').innerText = "¡LIMPIEZA EXITOSA!";
+            } catch (err) {
+                showError("Error al procesar el archivo. Intenta con otro video.");
+            }
+        }
+
+        function showError(m) {
+            document.getElementById('error-msg').classList.remove('hidden');
+            document.getElementById('error-detail').innerText = m;
+            document.getElementById('progress-container').classList.add('hidden');
+        }
+
+        // Carga inicial
+        initFFmpeg();
+    </script>
 </body>
 </html>
