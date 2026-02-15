@@ -1,0 +1,5 @@
+{
+  "name": "Limpiador de Metadatos Pro",
+  "description": "Aplicación avanzada para limpiar metadatos de videos y optimizarlos para redes sociales, utilizando FFmpeg WASM y análisis de IA con Gemini.",
+  "requestFramePermissions": []
+}
