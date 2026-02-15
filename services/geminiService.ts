@@ -2,10 +2,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
+// Initialize the Google GenAI client with the API key from environment variables.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeVideoContent = async (fileName: string): Promise<AIAnalysisResult> => {
   try {
+    // Call the Gemini model to analyze the video filename and generate social media content.
+    // Using gemini-3-flash-preview for efficient text generation and reasoning.
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Analiza este nombre de archivo de video destinado a redes sociales: "${fileName}". 
@@ -34,7 +37,9 @@ export const analyzeVideoContent = async (fileName: string): Promise<AIAnalysisR
       }
     });
 
-    return JSON.parse(response.text.trim());
+    // Access the text property directly (it is a getter property, not a method).
+    const text = response.text || '{}';
+    return JSON.parse(text.trim());
   } catch (error) {
     console.error("Error en análisis de Gemini:", error);
     return {

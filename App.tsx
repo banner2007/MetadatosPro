@@ -1,11 +1,12 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { fetchFile } from '@ffmpeg/util';
 import { analyzeVideoContent } from './services/geminiService';
 import { AppStatus, AIAnalysisResult } from './types';
 
 const Header = () => (
-  <header className="py-12 text-center animate-in fade-in slide-in-from-top-4 duration-1000">
+  <header className="py-12 text-center">
     <h1 className="text-6xl font-black mb-4 tracking-tighter">
       <span className="gradient-text">Metadata Purge</span>
     </h1>
@@ -37,12 +38,10 @@ const TechnicalReport = ({ fileName }: { fileName: string }) => (
       <p className="text-blue-400 font-black text-sm uppercase tracking-tighter">Reporte de Auditoría de Privacidad</p>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-8 border-t border-white/5 pt-4">
-      <div className="flex justify-between"><span className="text-slate-500">ID de Sesión:</span> <span className="text-slate-300">#{(Math.random() * 0xFFFFFF << 0).toString(16).toUpperCase()}</span></div>
       <div className="flex justify-between"><span className="text-slate-500">GPS/GEO Data:</span> <span className="text-green-500 font-bold">PURGADO</span></div>
       <div className="flex justify-between"><span className="text-slate-500">Device Signature:</span> <span className="text-green-500 font-bold">ELIMINADO</span></div>
       <div className="flex justify-between"><span className="text-slate-500">IPTC/XMP Data:</span> <span className="text-green-500 font-bold">LIMPIO</span></div>
-      <div className="flex justify-between"><span className="text-slate-500">Algoritmo:</span> <span className="text-slate-300">FFMPEG-WASM</span></div>
-      <div className="flex justify-between"><span className="text-slate-500">Privacidad:</span> <span className="text-slate-300">100% LOCAL</span></div>
+      <div className="flex justify-between"><span className="text-slate-500">Privacidad:</span> <span className="text-green-500 font-bold">100% LOCAL</span></div>
     </div>
     <p className="mt-6 text-[10px] text-slate-600 font-bold uppercase tracking-widest text-center italic">
       * El archivo "{fileName}" ha sido anonimizado con éxito.
@@ -69,7 +68,7 @@ const App: React.FC = () => {
     try {
       const ffmpeg = new FFmpeg();
       
-      // CARGA LOCAL PARA PRODUCCIÓN EN CLOUD RUN
+      // CARGA LOCAL OBLIGATORIA
       await ffmpeg.load({
         coreURL: '/ffmpeg/ffmpeg-core.js',
         wasmURL: '/ffmpeg/ffmpeg-core.wasm',
@@ -80,7 +79,7 @@ const App: React.FC = () => {
       setStatus(AppStatus.IDLE);
     } catch (error: any) {
       console.error("FFmpeg Load Error:", error);
-      setErrorMsg(`Fallo de carga local: ${error.message || 'Error de sistema'}.`);
+      setErrorMsg(`Error de carga local: ${error.message}. Verifica que /ffmpeg/ exista en el dominio.`);
       setStatus(AppStatus.ERROR);
     }
   };
@@ -90,11 +89,11 @@ const App: React.FC = () => {
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Fix: Access files via target casted to any to resolve "Property 'files' does not exist on type 'EventTarget & HTMLInputElement'" TypeScript error
-    const file = (e.target as any).files?.[0];
+    // FIX: Cast e.target to HTMLInputElement to access the 'files' property.
+    const file = (e.target as HTMLInputElement).files?.[0];
     if (file) {
-      if (file.size > 200 * 1024 * 1024) {
-        setErrorMsg("Máximo 200MB permitido.");
+      if (file.size > 500 * 1024 * 1024) {
+        setErrorMsg("Máximo 500MB permitido.");
         setStatus(AppStatus.ERROR);
         return;
       }
@@ -137,10 +136,10 @@ const App: React.FC = () => {
       const url = URL.createObjectURL(new Blob([(data as Uint8Array).buffer], { type: 'video/mp4' }));
       setOutputUrl(url);
 
-      // Fix: Access document through the window object to resolve "Cannot find name 'document'" TypeScript error
+      // FIX: Use window.document to avoid issues when 'document' is not globally identified by TypeScript.
       const link = (window as any).document.createElement('a');
       link.href = url;
-      link.download = `limpio_${videoFile.name}`;
+      link.download = `purgado_${videoFile.name}`;
       (window as any).document.body.appendChild(link);
       link.click();
       (window as any).document.body.removeChild(link);
@@ -159,7 +158,7 @@ const App: React.FC = () => {
       setStatus(AppStatus.COMPLETED);
     } catch (error: any) {
       console.error(error);
-      setErrorMsg("Error de procesamiento. El archivo no es compatible.");
+      setErrorMsg("Fallo al procesar. Intenta con un archivo menos pesado o compatible.");
       setStatus(AppStatus.ERROR);
     }
   };
@@ -180,9 +179,9 @@ const App: React.FC = () => {
         <section className="glass-panel rounded-[3rem] p-10 shadow-2xl relative overflow-hidden">
           {status === AppStatus.LOADING_FFMPEG && (
             <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-2xl z-40 flex flex-col items-center justify-center text-center px-4">
-              <div className="w-24 h-24 border-8 border-blue-600 border-t-transparent rounded-full animate-spin mb-8 shadow-[0_0_30px_rgba(37,99,235,0.4)]"></div>
-              <h3 className="text-white font-black text-3xl uppercase tracking-tighter">Preparando FFmpeg Local</h3>
-              <p className="text-slate-500 text-sm mt-4 font-bold uppercase tracking-widest">Sin dependencias externas...</p>
+              <div className="w-24 h-24 border-8 border-blue-600 border-t-transparent rounded-full animate-spin mb-8 shadow-blue-500/40"></div>
+              <h3 className="text-white font-black text-3xl uppercase tracking-tighter">Iniciando Motor Seguro</h3>
+              <p className="text-slate-500 text-sm mt-4 font-bold uppercase tracking-widest">Cargando Wasm localmente...</p>
             </div>
           )}
 
@@ -195,15 +194,15 @@ const App: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
                   </div>
-                  <h4 className="mb-2 text-4xl font-black text-white uppercase tracking-tighter">Seleccionar Video</h4>
-                  <p className="text-slate-500 text-sm font-black uppercase tracking-widest opacity-60">Privacidad Total en Cloud Run</p>
+                  <h4 className="mb-2 text-4xl font-black text-white uppercase tracking-tighter">Subir Video</h4>
+                  <p className="text-slate-500 text-sm font-black uppercase tracking-widest opacity-60">Privacidad local sin CDNs externos</p>
                 </div>
                 <input type="file" className="hidden" accept="video/*" onChange={handleFileChange} />
               </label>
             )}
 
             {videoFile && status !== AppStatus.COMPLETED && status !== AppStatus.ERROR && (
-              <div className="w-full space-y-8 animate-in zoom-in-95 duration-500">
+              <div className="w-full space-y-8">
                 <div className="flex items-center justify-between p-8 bg-black/40 rounded-[2.5rem] border border-white/5">
                   <div className="flex items-center space-x-6">
                     <div className="bg-blue-600/20 p-5 rounded-3xl">
@@ -226,16 +225,16 @@ const App: React.FC = () => {
                 {status === AppStatus.IDLE && (
                   <button
                     onClick={processVideo}
-                    className="w-full py-8 bg-blue-600 hover:bg-blue-500 text-white font-black text-3xl rounded-[2rem] transition-all shadow-xl shadow-blue-900/40 active:scale-95 transform hover:-translate-y-1"
+                    className="w-full py-8 bg-blue-600 hover:bg-blue-500 text-white font-black text-3xl rounded-[2rem] transition-all shadow-xl shadow-blue-900/40"
                   >
-                    PURGAR METADATOS
+                    PURGAR Y DESCARGAR
                   </button>
                 )}
 
                 {(status === AppStatus.PROCESSING || status === AppStatus.ANALYZING) && (
                   <ProgressBar 
                     progress={progress || (status === AppStatus.ANALYZING ? 95 : 10)} 
-                    label={status === AppStatus.PROCESSING ? "Procesando en local..." : "Informe Gemini..."} 
+                    label={status === AppStatus.PROCESSING ? "Limpiando huellas digitales..." : "Generando informe IA..."} 
                   />
                 )}
               </div>
@@ -250,7 +249,7 @@ const App: React.FC = () => {
                     </svg>
                   </div>
                   <div>
-                    <h4 className="text-green-500 font-black text-3xl uppercase">Listo para Redes</h4>
+                    <h4 className="text-green-500 font-black text-3xl uppercase tracking-tighter">Éxito</h4>
                     <p className="text-green-400/70 text-lg font-bold">Metadatos eliminados permanentemente.</p>
                   </div>
                 </div>
@@ -277,10 +276,10 @@ const App: React.FC = () => {
 
             {status === AppStatus.ERROR && (
                <div className="w-full p-10 bg-red-600/10 border border-red-500/30 rounded-[3rem] animate-shake-x">
-                  <h5 className="text-red-500 font-black text-3xl uppercase mb-4 tracking-tighter">Error Crítico</h5>
+                  <h5 className="text-red-500 font-black text-3xl uppercase mb-4 tracking-tighter">Fallo del Sistema</h5>
                   <p className="text-red-400/80 text-lg mb-10 font-bold leading-tight">{errorMsg}</p>
-                  <button onClick={() => { reset(); loadFFmpeg(); }} className="w-full py-6 bg-red-600/20 text-red-500 font-black text-xl rounded-3xl border border-red-500/30 transition-all hover:bg-red-600/30">
-                    REINTENTAR
+                  <button onClick={() => { reset(); loadFFmpeg(); }} className="w-full py-6 bg-red-600/20 text-red-500 font-black text-xl rounded-3xl border border-red-500/30 transition-all">
+                    REINTENTAR CARGA
                   </button>
                </div>
             )}
@@ -295,7 +294,7 @@ const App: React.FC = () => {
                   <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
                 </svg>
               </span>
-              Optimización Gemini
+              Gemini AI Insight
             </h2>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -311,7 +310,7 @@ const App: React.FC = () => {
                 </div>
               </div>
               <div className="glass-panel p-12 rounded-[3.5rem] group hover:border-green-500/30 transition-all duration-700 shadow-2xl">
-                <h3 className="text-green-500 text-xs font-black uppercase tracking-[0.5em] mb-10">Tips de Impacto</h3>
+                <h3 className="text-green-500 text-xs font-black uppercase tracking-[0.5em] mb-10">Tips de Optimización</h3>
                 <ul className="space-y-10">
                   {aiResult.optimizationTips.map((tip, i) => (
                     <li key={i} className="flex items-start gap-8">

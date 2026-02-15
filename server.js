@@ -9,21 +9,21 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// CABECERAS CRÍTICAS PARA FFmpeg WASM (SharedArrayBuffer)
+// Cabeceras obligatorias para SharedArrayBuffer (FFmpeg)
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   next();
 });
 
-// Servir archivos estáticos del build de Vite
+// Servir archivos estáticos del build
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Fallback para React Router / SPA
+// SPA Fallback: redirigir todas las peticiones no encontradas al index.html
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Producción corriendo en puerto ${PORT}`);
 });
